@@ -182,8 +182,8 @@ export default function RecordingPillPage() {
   }, [isDisabled, restoreMainWindow]);
 
   return (
-    <div className="flex h-screen w-screen items-center justify-center overflow-hidden bg-transparent">
-      <div className="flex h-14 w-[200px] select-none items-center rounded-full border border-gray-200 bg-white pl-3 pr-2 shadow-[0_10px_24px_rgba(15,23,42,0.18)]">
+    <div className="h-screen w-screen overflow-hidden rounded-full bg-transparent">
+      <div className="flex h-full w-full select-none items-center rounded-full border border-gray-200 bg-white pl-3 pr-2 shadow-none">
         <button
           type="button"
           data-tauri-drag-region
@@ -224,11 +224,11 @@ export default function RecordingPillPage() {
           <Square size={17} fill="currentColor" strokeWidth={2.2} />
         </button>
 
-        <div className="ml-3 mr-1 flex h-9 w-[46px] shrink-0 items-center justify-between pr-2" aria-hidden="true">
+        <div className="ml-3 flex h-9 w-[45px] shrink-0 items-center justify-between pr-2.5" aria-hidden="true">
           {bars.map((level, index) => (
             <span
               key={index}
-              className={`w-[3px] rounded-full transition-all duration-150 ${isPaused ? 'bg-red-300' : 'bg-red-500'}`}
+              className={`w-1 rounded-full transition-all duration-150 ${isPaused ? 'bg-red-300' : 'bg-red-500'}`}
               style={{
                 height: `${Math.round(8 + level * 24)}px`,
                 opacity: isPaused ? 0.65 : 1,

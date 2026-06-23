@@ -64,15 +64,73 @@ use tokio::sync::RwLock;
 
 static RECORDING_FLAG: AtomicBool = AtomicBool::new(false);
 
+#[cfg(windows)]
+fn apply_recording_pill_window_region<R: Runtime>(pill_window: &tauri::WebviewWindow<R>) {
+    use windows_sys::Win32::Graphics::Gdi::{
+        CreateRoundRectRgn, DeleteObject, SetWindowRgn,
+    };
+
+    let size = match pill_window.inner_size() {
+        Ok(size) => size,
+        Err(e) => {
+            log::warn!("Failed to get recording pill window size for clipping: {}", e);
+            return;
+        }
+    };
+
+    let width = match i32::try_from(size.width) {
+        Ok(width) if width > 0 => width,
+        _ => {
+            log::warn!("Invalid recording pill window width for clipping: {}", size.width);
+            return;
+        }
+    };
+
+    let height = match i32::try_from(size.height) {
+        Ok(height) if height > 0 => height,
+        _ => {
+            log::warn!("Invalid recording pill window height for clipping: {}", size.height);
+            return;
+        }
+    };
+
+    let hwnd = match pill_window.hwnd() {
+        Ok(hwnd) => hwnd,
+        Err(e) => {
+            log::warn!("Failed to get recording pill HWND for clipping: {}", e);
+            return;
+        }
+    };
+
+    unsafe {
+        let region = CreateRoundRectRgn(0, 0, width + 1, height + 1, height, height);
+        if region.is_null() {
+            log::warn!("Failed to create recording pill rounded region");
+            return;
+        }
+
+        if SetWindowRgn(hwnd.0 as _, region, 1) == 0 {
+            let _ = DeleteObject(region);
+            log::warn!("Failed to apply recording pill rounded region");
+        }
+    }
+}
+
+#[cfg(not(windows))]
+fn apply_recording_pill_window_region<R: Runtime>(_pill_window: &tauri::WebviewWindow<R>) {}
+
 pub(crate) fn show_recording_pill_window<R: Runtime>(app: &AppHandle<R>) {
     if let Some(pill_window) = app.get_webview_window("recording-pill") {
         if let Err(e) = pill_window.set_always_on_top(true) {
             log::error!("Failed to keep recording pill on top: {}", e);
         }
 
+        apply_recording_pill_window_region(&pill_window);
+
         if let Err(e) = pill_window.show() {
             log::error!("Failed to show recording pill window: {}", e);
         } else {
+            apply_recording_pill_window_region(&pill_window);
             log::info!("Recording pill window shown");
         }
     } else {

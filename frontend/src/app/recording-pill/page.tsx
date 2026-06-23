@@ -81,8 +81,12 @@ export default function RecordingPillPage() {
       console.error('[RecordingPill] Failed to disable window shadow:', error);
     });
 
-    currentWebview.setBackgroundColor(null).catch((error) => {
-      console.error('[RecordingPill] Failed to set transparent background:', error);
+    currentWindow.setBackgroundColor([0, 0, 0, 0]).catch((error) => {
+      console.error('[RecordingPill] Failed to set transparent window background:', error);
+    });
+
+    currentWebview.setBackgroundColor([0, 0, 0, 0]).catch((error) => {
+      console.error('[RecordingPill] Failed to set transparent webview background:', error);
     });
 
     let unlisten: (() => void) | undefined;
@@ -220,11 +224,11 @@ export default function RecordingPillPage() {
           <Square size={17} fill="currentColor" strokeWidth={2.2} />
         </button>
 
-        <div className="ml-3 mr-1 flex h-9 w-[48px] shrink-0 items-center justify-between pr-1.5" aria-hidden="true">
+        <div className="ml-3 mr-1 flex h-9 w-[46px] shrink-0 items-center justify-between pr-2" aria-hidden="true">
           {bars.map((level, index) => (
             <span
               key={index}
-              className={`w-1.5 rounded-full transition-all duration-150 ${isPaused ? 'bg-red-300' : 'bg-red-500'}`}
+              className={`w-[3px] rounded-full transition-all duration-150 ${isPaused ? 'bg-red-300' : 'bg-red-500'}`}
               style={{
                 height: `${Math.round(8 + level * 24)}px`,
                 opacity: isPaused ? 0.65 : 1,

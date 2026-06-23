@@ -2,13 +2,22 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { emit } from '@tauri-apps/api/event';
+import { emit, listen } from '@tauri-apps/api/event';
 import { appDataDir } from '@tauri-apps/api/path';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { Pause, Play, Square } from 'lucide-react';
 import { useRecordingState } from '@/contexts/RecordingStateContext';
 
 const BAR_COUNT = 6;
+
+interface AudioLevelData {
+  rms_level: number;
+  peak_level: number;
+}
+
+interface AudioLevelUpdate {
+  levels: AudioLevelData[];
+}
 
 function buildBarLevels(seed: number) {
   return Array.from({ length: BAR_COUNT }, (_, index) => {
@@ -18,10 +27,24 @@ function buildBarLevels(seed: number) {
   });
 }
 
+function buildAudioBarLevels(rmsLevel: number, peakLevel: number) {
+  const rms = Math.max(0, Math.min(1, rmsLevel));
+  const peak = Math.max(rms, Math.min(1, peakLevel));
+  const level = Math.max(0.12, Math.min(1, rms * 2.7 + peak * 0.35));
+
+  return Array.from({ length: BAR_COUNT }, (_, index) => {
+    const emphasis = index === 2 || index === 3 ? 1 : 0.72;
+    const taper = index === 0 || index === 5 ? 0.58 : emphasis;
+    const motion = 0.82 + Math.sin(Date.now() / 125 + index * 0.9) * 0.18;
+    return Math.max(0.16, Math.min(1, level * taper * motion));
+  });
+}
+
 export default function RecordingPillPage() {
   const { isRecording, isPaused, isStopping } = useRecordingState();
   const [bars, setBars] = useState(() => buildBarLevels(0.4));
   const [isBusy, setIsBusy] = useState(false);
+  const [hasRecentAudioLevels, setHasRecentAudioLevels] = useState(false);
 
   const isDisabled = isBusy || isStopping || !isRecording;
 
@@ -32,15 +55,47 @@ export default function RecordingPillPage() {
   useEffect(() => {
     if (!isRecording || isPaused) {
       setBars(quietBars);
+      setHasRecentAudioLevels(false);
       return;
     }
 
     const intervalId = window.setInterval(() => {
+      if (hasRecentAudioLevels) {
+        setHasRecentAudioLevels(false);
+        return;
+      }
+
       setBars(buildBarLevels(Date.now() / 230));
     }, 110);
 
     return () => window.clearInterval(intervalId);
-  }, [isPaused, isRecording, quietBars]);
+  }, [hasRecentAudioLevels, isPaused, isRecording, quietBars]);
+
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+
+    listen<AudioLevelUpdate>('audio-levels', (event) => {
+      if (!isRecording || isPaused) return;
+
+      const levels = event.payload.levels ?? [];
+      if (!levels.length) return;
+
+      const loudest = levels.reduce((best, current) => (
+        current.peak_level > best.peak_level ? current : best
+      ), levels[0]);
+
+      setHasRecentAudioLevels(true);
+      setBars(buildAudioBarLevels(loudest.rms_level, loudest.peak_level));
+    }).then((listener) => {
+      unlisten = listener;
+    }).catch((error) => {
+      console.error('[RecordingPill] Failed to listen for audio levels:', error);
+    });
+
+    return () => {
+      unlisten?.();
+    };
+  }, [isPaused, isRecording]);
 
   const startDragging = useCallback(async () => {
     try {

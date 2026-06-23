@@ -56,13 +56,23 @@ function buildAudioBarLevels(rmsLevel: number, peakLevel: number) {
 }
 
 export default function RecordingPillPage() {
-  const { activeDuration, isRecording, isPaused, isStopping, recordingDuration } = useRecordingState();
+  const {
+    activeDuration,
+    isProcessing,
+    isRecording,
+    isPaused,
+    isSaving,
+    isStopping,
+    recordingDuration,
+  } = useRecordingState();
   const [bars, setBars] = useState(() => buildBarLevels(0.4));
   const [isBusy, setIsBusy] = useState(false);
   const [hasRecentAudioLevels, setHasRecentAudioLevels] = useState(false);
+  const [isStopRequested, setIsStopRequested] = useState(false);
 
   const isDisabled = isBusy || isStopping || !isRecording;
-  const elapsedText = formatElapsedTime(recordingDuration ?? activeDuration ?? 0);
+  const isFinalizing = isStopRequested || isStopping || isProcessing || isSaving;
+  const elapsedText = isFinalizing ? 'saving' : formatElapsedTime(recordingDuration ?? activeDuration ?? 0);
 
   const quietBars = useMemo(() => (
     [0.22, 0.34, 0.26, 0.4, 0.28, 0.32]
@@ -86,6 +96,12 @@ export default function RecordingPillPage() {
 
     return () => window.clearInterval(intervalId);
   }, [hasRecentAudioLevels, isPaused, isRecording, quietBars]);
+
+  useEffect(() => {
+    if (!isRecording && !isStopping && !isProcessing && !isSaving && !isBusy) {
+      setIsStopRequested(false);
+    }
+  }, [isBusy, isProcessing, isRecording, isSaving, isStopping]);
 
   useEffect(() => {
     const currentWindow = getCurrentWindow();
@@ -174,6 +190,7 @@ export default function RecordingPillPage() {
     if (isDisabled) return;
 
     setIsBusy(true);
+    setIsStopRequested(true);
     try {
       await restoreMainWindow();
       await new Promise(resolve => window.setTimeout(resolve, 250));
@@ -190,6 +207,7 @@ export default function RecordingPillPage() {
       await emit('recording-stop-complete', true);
     } catch (error) {
       console.error('[RecordingPill] Failed to stop recording:', error);
+      setIsStopRequested(false);
     } finally {
       setIsBusy(false);
     }
@@ -197,7 +215,7 @@ export default function RecordingPillPage() {
 
   return (
     <div className="h-screen w-screen overflow-hidden rounded-full bg-transparent p-px">
-      <div className="flex h-full w-full select-none items-center rounded-full bg-white pl-2 pr-1.5 shadow-none">
+      <div className="flex h-full w-full select-none items-center rounded-full border border-gray-300 bg-white bg-clip-padding pl-2 pr-1.5 shadow-none">
         <button
           type="button"
           data-tauri-drag-region
@@ -251,7 +269,7 @@ export default function RecordingPillPage() {
               />
             ))}
           </div>
-          <span className="w-full text-center font-mono text-[8px] leading-none text-gray-500 tabular-nums">
+          <span className="w-full text-center font-mono text-[9px] leading-none text-gray-500 tabular-nums">
             {elapsedText}
           </span>
         </div>

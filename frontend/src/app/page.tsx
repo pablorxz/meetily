@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { listen } from '@tauri-apps/api/event';
 import { RecordingControls } from '@/components/RecordingControls';
 import { useSidebar } from '@/components/Sidebar/SidebarProvider';
 import { usePermissionCheck } from '@/hooks/usePermissionCheck';
@@ -22,10 +23,45 @@ import { indexedDBService } from '@/services/indexedDBService';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 
+const BAR_COUNT = 6;
+const QUIET_BAR_HEIGHTS = ['10px', '16px', '13px', '18px', '14px', '16px'];
+
+interface AudioLevelData {
+  rms_level: number;
+  peak_level: number;
+}
+
+interface AudioLevelUpdate {
+  levels: AudioLevelData[];
+}
+
+function buildFallbackBarHeights(seed: number) {
+  return Array.from({ length: BAR_COUNT }, (_, index) => {
+    const wave = Math.sin(seed * (0.9 + index * 0.11) + index * 1.35);
+    const secondary = Math.sin(seed * 0.37 + index * 0.73);
+    const level = 0.22 + Math.abs(wave) * 0.58 + Math.max(0, secondary) * 0.2;
+    return `${Math.round(8 + level * 22)}px`;
+  });
+}
+
+function buildAudioBarHeights(rmsLevel: number, peakLevel: number) {
+  const rms = Math.max(0, Math.min(1, rmsLevel));
+  const peak = Math.max(rms, Math.min(1, peakLevel));
+  const level = Math.max(0.12, Math.min(1, rms * 2.7 + peak * 0.35));
+
+  return Array.from({ length: BAR_COUNT }, (_, index) => {
+    const emphasis = index === 2 || index === 3 ? 1 : 0.72;
+    const taper = index === 0 || index === 5 ? 0.58 : emphasis;
+    const motion = 0.82 + Math.sin(Date.now() / 125 + index * 0.9) * 0.18;
+    return `${Math.round(8 + Math.max(0.16, Math.min(1, level * taper * motion)) * 24)}px`;
+  });
+}
+
 export default function Home() {
   // Local page state (not moved to contexts)
   const [isRecording, setIsRecordingState] = useState(false);
-  const [barHeights, setBarHeights] = useState(['58%', '76%', '58%']);
+  const [barHeights, setBarHeights] = useState(QUIET_BAR_HEIGHTS);
+  const [hasRecentAudioLevels, setHasRecentAudioLevels] = useState(false);
   const [showRecoveryDialog, setShowRecoveryDialog] = useState(false);
 
   // Use contexts for state management
@@ -171,20 +207,49 @@ export default function Home() {
   };
 
   useEffect(() => {
-    if (recordingState.isRecording) {
-      const interval = setInterval(() => {
-        setBarHeights(prev => {
-          const newHeights = [...prev];
-          newHeights[0] = Math.random() * 20 + 10 + 'px';
-          newHeights[1] = Math.random() * 20 + 10 + 'px';
-          newHeights[2] = Math.random() * 20 + 10 + 'px';
-          return newHeights;
-        });
-      }, 300);
-
-      return () => clearInterval(interval);
+    if (!recordingState.isRecording || recordingState.isPaused) {
+      setHasRecentAudioLevels(false);
+      setBarHeights(QUIET_BAR_HEIGHTS);
+      return;
     }
-  }, [recordingState.isRecording]);
+
+    const interval = setInterval(() => {
+      if (hasRecentAudioLevels) {
+        setHasRecentAudioLevels(false);
+        return;
+      }
+
+      setBarHeights(buildFallbackBarHeights(Date.now() / 230));
+    }, 120);
+
+    return () => clearInterval(interval);
+  }, [hasRecentAudioLevels, recordingState.isPaused, recordingState.isRecording]);
+
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+
+    listen<AudioLevelUpdate>('audio-levels', (event) => {
+      if (!recordingState.isRecording || recordingState.isPaused) return;
+
+      const levels = event.payload.levels ?? [];
+      if (!levels.length) return;
+
+      const loudest = levels.reduce((best, current) => (
+        current.peak_level > best.peak_level ? current : best
+      ), levels[0]);
+
+      setHasRecentAudioLevels(true);
+      setBarHeights(buildAudioBarHeights(loudest.rms_level, loudest.peak_level));
+    }).then((listener) => {
+      unlisten = listener;
+    }).catch((error) => {
+      console.error('[Home] Failed to listen for audio levels:', error);
+    });
+
+    return () => {
+      unlisten?.();
+    };
+  }, [recordingState.isPaused, recordingState.isRecording]);
 
   // Computed values using global status
   const isProcessingStop = status === RecordingStatus.PROCESSING_TRANSCRIPTS || isProcessing;

@@ -71,7 +71,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   const pathname = usePathname()
-  const isRecordingPillRoute = pathname === '/recording-pill'
+  const isRecordingPillRoute = pathname === '/recording-pill' || pathname === '/recording-pill.html'
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [onboardingCompleted, setOnboardingCompleted] = useState(false)
 

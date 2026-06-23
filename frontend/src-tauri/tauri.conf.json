@@ -12,6 +12,7 @@
     "app": {
         "windows": [
             {
+                "label": "main",
                 "title": "meetily",
                 "width": 1100,
                 "height": 700,
@@ -19,6 +20,28 @@
                 "fullscreen": false,
                 "theme": "Light",
                 "decorations": true
+            },
+            {
+                "label": "recording-pill",
+                "url": "recording-pill.html",
+                "title": "Meetily recording controls",
+                "width": 238,
+                "height": 86,
+                "minWidth": 238,
+                "minHeight": 86,
+                "maxWidth": 238,
+                "maxHeight": 86,
+                "center": true,
+                "resizable": false,
+                "maximizable": false,
+                "minimizable": false,
+                "fullscreen": false,
+                "theme": "Light",
+                "decorations": false,
+                "transparent": true,
+                "alwaysOnTop": true,
+                "skipTaskbar": true,
+                "visible": false
             }
         ],
         "macOSPrivateApi": true,

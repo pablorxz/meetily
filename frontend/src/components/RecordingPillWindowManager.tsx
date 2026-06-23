@@ -7,7 +7,7 @@ import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { useRecordingState } from '@/contexts/RecordingStateContext';
 
 const RECORDING_PILL_LABEL = 'recording-pill';
-const RECORDING_PILL_ROUTE = '/recording-pill';
+const RECORDING_PILL_ROUTE = 'recording-pill.html';
 
 export default function RecordingPillWindowManager() {
   const { isRecording } = useRecordingState();
@@ -134,6 +134,8 @@ export default function RecordingPillWindowManager() {
 
       return;
     }
+
+    showPillWindow();
 
     const mainWindow = getCurrentWindow();
     const intervalId = window.setInterval(async () => {

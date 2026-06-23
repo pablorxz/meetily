@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useRef } from 'react';
-import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { useRecordingState } from '@/contexts/RecordingStateContext';
@@ -11,13 +10,7 @@ const RECORDING_PILL_ROUTE = 'recording-pill.html';
 
 export default function RecordingPillWindowManager() {
   const { isRecording } = useRecordingState();
-  const isRecordingRef = useRef(isRecording);
-  const hiddenMainForRecordingRef = useRef(false);
   const pillWindowRef = useRef<WebviewWindow | null>(null);
-
-  useEffect(() => {
-    isRecordingRef.current = isRecording;
-  }, [isRecording]);
 
   const getPillWindow = useCallback(async () => {
     const existing = await WebviewWindow.getByLabel(RECORDING_PILL_LABEL);
@@ -72,66 +65,9 @@ export default function RecordingPillWindowManager() {
     }
   }, []);
 
-  const restoreMainWindow = useCallback(async () => {
-    const mainWindow = getCurrentWindow();
-
-    try {
-      await mainWindow.show();
-
-      if (await mainWindow.isMinimized()) {
-        await mainWindow.unminimize();
-      }
-
-      await mainWindow.setFocus();
-      hiddenMainForRecordingRef.current = false;
-      await hidePillWindow();
-    } catch (error) {
-      console.error('[RecordingPillWindowManager] Failed to restore main window:', error);
-    }
-  }, [hidePillWindow]);
-
-  useEffect(() => {
-    let unlistenClose: (() => void) | undefined;
-    const mainWindow = getCurrentWindow();
-
-    mainWindow.onCloseRequested(async (event) => {
-      if (!isRecordingRef.current) {
-        return;
-      }
-
-      event.preventDefault();
-      hiddenMainForRecordingRef.current = true;
-      await showPillWindow();
-      await mainWindow.hide();
-    }).then((unlisten) => {
-      unlistenClose = unlisten;
-    });
-
-    return () => {
-      unlistenClose?.();
-    };
-  }, [showPillWindow]);
-
-  useEffect(() => {
-    let unlistenRestore: (() => void) | undefined;
-
-    listen('recording-pill-restore-main', restoreMainWindow).then((unlisten) => {
-      unlistenRestore = unlisten;
-    });
-
-    return () => {
-      unlistenRestore?.();
-    };
-  }, [restoreMainWindow]);
-
   useEffect(() => {
     if (!isRecording) {
       hidePillWindow();
-
-      if (hiddenMainForRecordingRef.current) {
-        restoreMainWindow();
-      }
-
       return;
     }
 
@@ -149,7 +85,7 @@ export default function RecordingPillWindowManager() {
     }, 700);
 
     return () => window.clearInterval(intervalId);
-  }, [hidePillWindow, isRecording, restoreMainWindow, showPillWindow]);
+  }, [hidePillWindow, isRecording, showPillWindow]);
 
   return null;
 }

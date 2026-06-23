@@ -255,13 +255,13 @@ export default function RootLayout({
                     <UpdateCheckProvider>
                       <SidebarProvider>
                         <TooltipProvider>
-                          <RecordingPostProcessingProvider>
-                            <ImportDialogProvider onOpen={handleOpenImportDialog}>
-                              {isRecordingPillRoute ? (
-                                <main className="min-h-screen overflow-hidden bg-transparent">
-                                  {children}
-                                </main>
-                              ) : (
+                          {isRecordingPillRoute ? (
+                            <main className="min-h-screen overflow-hidden bg-transparent">
+                              {children}
+                            </main>
+                          ) : (
+                            <RecordingPostProcessingProvider>
+                              <ImportDialogProvider onOpen={handleOpenImportDialog}>
                                 <>
                                   <RecordingPillWindowManager />
 
@@ -285,9 +285,9 @@ export default function RootLayout({
                                     importFilePath={importFilePath}
                                   />
                                 </>
-                              )}
-                            </ImportDialogProvider>
-                          </RecordingPostProcessingProvider>
+                              </ImportDialogProvider>
+                            </RecordingPostProcessingProvider>
+                          )}
                         </TooltipProvider>
                       </SidebarProvider>
                     </UpdateCheckProvider>

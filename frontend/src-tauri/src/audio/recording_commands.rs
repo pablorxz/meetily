@@ -297,6 +297,8 @@ pub async fn start_recording_with_meeting_name<R: Runtime>(
         "workers": 3
     })).map_err(|e| e.to_string())?;
 
+    crate::show_recording_pill_window(&app);
+
     // Update tray menu to reflect recording state
     crate::tray::update_tray_menu(&app);
 
@@ -470,6 +472,8 @@ pub async fn start_recording_with_devices_and_meeting<R: Runtime>(
         ],
         "workers": 3
     })).map_err(|e| e.to_string())?;
+
+    crate::show_recording_pill_window(&app);
 
     // Update tray menu to reflect recording state
     crate::tray::update_tray_menu(&app);
@@ -849,6 +853,7 @@ pub async fn stop_recording<R: Runtime>(
     // Set recording flag to false
     info!("🔍 Setting IS_RECORDING to false");
     IS_RECORDING.store(false, Ordering::SeqCst);
+    crate::hide_recording_pill_window(&app);
 
     // Step 4.5: Prepare metadata for frontend (NO database save)
     // NOTE: We do NOT save to database here. The frontend will save after all transcripts are displayed.

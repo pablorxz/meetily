@@ -64,6 +64,32 @@ use tokio::sync::RwLock;
 
 static RECORDING_FLAG: AtomicBool = AtomicBool::new(false);
 
+pub(crate) fn show_recording_pill_window<R: Runtime>(app: &AppHandle<R>) {
+    if let Some(pill_window) = app.get_webview_window("recording-pill") {
+        if let Err(e) = pill_window.set_always_on_top(true) {
+            log::error!("Failed to keep recording pill on top: {}", e);
+        }
+
+        if let Err(e) = pill_window.show() {
+            log::error!("Failed to show recording pill window: {}", e);
+        } else {
+            log::info!("Recording pill window shown");
+        }
+    } else {
+        log::warn!("Recording pill window not found");
+    }
+}
+
+pub(crate) fn hide_recording_pill_window<R: Runtime>(app: &AppHandle<R>) {
+    if let Some(pill_window) = app.get_webview_window("recording-pill") {
+        if let Err(e) = pill_window.hide() {
+            log::error!("Failed to hide recording pill window: {}", e);
+        } else {
+            log::info!("Recording pill window hidden");
+        }
+    }
+}
+
 // Global language preference storage (default to "auto-translate" for automatic translation to English)
 static LANGUAGE_PREFERENCE: std::sync::LazyLock<StdMutex<String>> =
     std::sync::LazyLock::new(|| StdMutex::new("auto-translate".to_string()));
@@ -111,6 +137,7 @@ async fn start_recording<R: Runtime>(
         Ok(_) => {
             RECORDING_FLAG.store(true, Ordering::SeqCst);
             tray::update_tray_menu(&app);
+            show_recording_pill_window(&app);
 
             log_info!("Recording started successfully");
 
@@ -163,6 +190,7 @@ async fn stop_recording<R: Runtime>(app: AppHandle<R>, args: RecordingArgs) -> R
         Ok(_) => {
             RECORDING_FLAG.store(false, Ordering::SeqCst);
             tray::update_tray_menu(&app);
+            hide_recording_pill_window(&app);
 
             // Create the save directory if it doesn't exist
             if let Some(parent) = std::path::Path::new(&args.save_path).parent() {
@@ -515,6 +543,12 @@ pub fn run() {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 if window.label() == "main" {
                     api.prevent_close();
+
+                    let app_handle = window.app_handle();
+                    if tauri::async_runtime::block_on(audio::recording_commands::is_recording()) {
+                        show_recording_pill_window(&app_handle);
+                    }
+
                     if let Err(e) = window.hide() {
                         log::error!("Failed to hide main window on close request: {}", e);
                     } else {

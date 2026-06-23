@@ -88,6 +88,7 @@ fn toggle_recording_handler<R: Runtime>(app: &AppHandle<R>) {
             match stop_result {
                 Ok(_) => {
                     log::info!("Tray toggle: Recording stopped successfully");
+                    crate::hide_recording_pill_window(&app_clone);
 
                     // Trigger frontend post-processing via event (works from any page)
                     // (SQLite save, navigation, analytics)
@@ -184,6 +185,7 @@ fn stop_recording_handler<R: Runtime>(app: &AppHandle<R>) {
         match stop_result {
             Ok(_) => {
                 log::info!("Tray: Recording stopped successfully");
+                crate::hide_recording_pill_window(&app_clone);
 
                 // Trigger frontend post-processing via event (works from any page)
                 // (SQLite save, navigation, analytics)
@@ -392,6 +394,8 @@ fn build_menu<R: Runtime>(
 }
 
 pub(crate) fn focus_main_window<R: Runtime>(app: &AppHandle<R>) {
+    crate::hide_recording_pill_window(app);
+
     if let Some(window) = app.get_webview_window("main") {
         if let Err(e) = window.unminimize() {
             log::error!("Failed to unminimize main window: {}", e);

@@ -5,6 +5,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { emit, listen } from '@tauri-apps/api/event';
 import { appDataDir } from '@tauri-apps/api/path';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { Pause, Play, Square } from 'lucide-react';
 import { useRecordingState } from '@/contexts/RecordingStateContext';
 
@@ -106,7 +107,24 @@ export default function RecordingPillPage() {
   }, []);
 
   const restoreMainWindow = useCallback(async () => {
-    await emit('recording-pill-restore-main');
+    const mainWindow = await WebviewWindow.getByLabel('main');
+    const pillWindow = getCurrentWindow();
+
+    try {
+      if (mainWindow) {
+        await mainWindow.show();
+
+        if (await mainWindow.isMinimized()) {
+          await mainWindow.unminimize();
+        }
+
+        await mainWindow.setFocus();
+      }
+
+      await pillWindow.hide();
+    } catch (error) {
+      console.error('[RecordingPill] Failed to restore main window:', error);
+    }
   }, []);
 
   const togglePause = useCallback(async () => {
@@ -127,6 +145,9 @@ export default function RecordingPillPage() {
 
     setIsBusy(true);
     try {
+      await restoreMainWindow();
+      await new Promise(resolve => window.setTimeout(resolve, 250));
+
       const dataDir = await appDataDir();
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       const savePath = `${dataDir}/recording-${timestamp}.wav`;
@@ -136,12 +157,13 @@ export default function RecordingPillPage() {
           save_path: savePath,
         },
       });
+      await emit('recording-stop-complete', true);
     } catch (error) {
       console.error('[RecordingPill] Failed to stop recording:', error);
     } finally {
       setIsBusy(false);
     }
-  }, [isDisabled]);
+  }, [isDisabled, restoreMainWindow]);
 
   return (
     <div className="flex h-screen w-screen items-center justify-center overflow-hidden bg-transparent">

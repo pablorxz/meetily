@@ -377,7 +377,7 @@ export function ModelManager({
     const modelNameMapping: { [key: string]: string } = {
       "small": "Small",
       "medium-q5_0": "Medium",
-      "large-v3-q5_0": "Large V3 Compressed",
+      "large-v3-q5_0": "Large V3 Q5 Vulkan Spanish/English",
       "large-v3-turbo": "Large V3 Turbo",
       "large-v3": "Large V3"
     };

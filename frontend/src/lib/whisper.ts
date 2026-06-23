@@ -122,7 +122,7 @@ export const MODEL_CONFIGS: Record<string, Partial<ModelInfo>> = {
     speed: 'Medium'
   },
   'large-v3-q5_0': {
-    description: 'Quantized large model, best balance of speed and accuracy.',
+    description: 'Quantized Large V3 Q5 model optimized for Vulkan and Spanish/English transcription.',
     size_mb: 1031,
     accuracy: 'High',
     speed: 'Slow'

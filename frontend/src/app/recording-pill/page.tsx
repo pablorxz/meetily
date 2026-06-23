@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { emit, listen } from '@tauri-apps/api/event';
 import { appDataDir } from '@tauri-apps/api/path';
+import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { Pause, Play, Square } from 'lucide-react';
@@ -73,6 +74,17 @@ export default function RecordingPillPage() {
   }, [hasRecentAudioLevels, isPaused, isRecording, quietBars]);
 
   useEffect(() => {
+    const currentWindow = getCurrentWindow();
+    const currentWebview = getCurrentWebview();
+
+    currentWindow.setShadow(false).catch((error) => {
+      console.error('[RecordingPill] Failed to disable window shadow:', error);
+    });
+
+    currentWebview.setBackgroundColor(null).catch((error) => {
+      console.error('[RecordingPill] Failed to set transparent background:', error);
+    });
+
     let unlisten: (() => void) | undefined;
 
     listen<AudioLevelUpdate>('audio-levels', (event) => {
@@ -167,9 +179,10 @@ export default function RecordingPillPage() {
 
   return (
     <div className="flex h-screen w-screen items-center justify-center overflow-hidden bg-transparent">
-      <div className="flex h-[68px] w-[226px] select-none items-center rounded-full border border-gray-200 bg-white px-4 shadow-[0_16px_38px_rgba(15,23,42,0.18)]">
+      <div className="flex h-14 w-[200px] select-none items-center rounded-full border border-gray-200 bg-white pl-3 pr-2 shadow-[0_10px_24px_rgba(15,23,42,0.18)]">
         <button
           type="button"
+          data-tauri-drag-region
           aria-label="Move recording controls"
           title="Drag to move"
           onMouseDown={(event) => {
@@ -178,7 +191,7 @@ export default function RecordingPillPage() {
             }
           }}
           onDoubleClick={restoreMainWindow}
-          className="mr-2 grid h-9 w-4 shrink-0 cursor-grab grid-cols-2 place-items-center gap-x-0.5 gap-y-1 rounded-full active:cursor-grabbing"
+          className="mr-2 grid h-8 w-4 shrink-0 cursor-grab grid-cols-2 place-items-center gap-x-0.5 gap-y-1 rounded-full active:cursor-grabbing"
         >
           {Array.from({ length: 6 }).map((_, index) => (
             <span key={index} className="h-1 w-1 rounded-full bg-gray-300" />
@@ -191,9 +204,9 @@ export default function RecordingPillPage() {
           title={isPaused ? 'Resume recording' : 'Pause recording'}
           disabled={isDisabled}
           onClick={togglePause}
-          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-[3px] border-gray-300 bg-white text-gray-600 transition-colors hover:border-gray-400 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-55"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-[3px] border-gray-300 bg-white text-gray-600 transition-colors hover:border-gray-400 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-55"
         >
-          {isPaused ? <Play size={19} fill="currentColor" /> : <Pause size={20} strokeWidth={2.7} />}
+          {isPaused ? <Play size={16} fill="currentColor" /> : <Pause size={17} strokeWidth={2.7} />}
         </button>
 
         <button
@@ -202,18 +215,18 @@ export default function RecordingPillPage() {
           title="Stop recording"
           disabled={isDisabled}
           onClick={stopRecording}
-          className="ml-3 flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-500 text-white transition-colors hover:bg-red-600 disabled:cursor-not-allowed disabled:bg-red-300"
+          className="ml-2.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-500 text-white transition-colors hover:bg-red-600 disabled:cursor-not-allowed disabled:bg-red-300"
         >
-          <Square size={20} fill="currentColor" strokeWidth={2.2} />
+          <Square size={17} fill="currentColor" strokeWidth={2.2} />
         </button>
 
-        <div className="ml-4 flex h-11 w-[54px] shrink-0 items-center justify-between" aria-hidden="true">
+        <div className="ml-3 mr-1 flex h-9 w-[48px] shrink-0 items-center justify-between pr-1.5" aria-hidden="true">
           {bars.map((level, index) => (
             <span
               key={index}
               className={`w-1.5 rounded-full transition-all duration-150 ${isPaused ? 'bg-red-300' : 'bg-red-500'}`}
               style={{
-                height: `${Math.round(10 + level * 28)}px`,
+                height: `${Math.round(8 + level * 24)}px`,
                 opacity: isPaused ? 0.65 : 1,
               }}
             />

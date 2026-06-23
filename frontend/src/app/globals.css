@@ -145,6 +145,15 @@
     height: 100%;
   }
 
+  html.recording-pill-window,
+  body.recording-pill-window {
+    background: transparent !important;
+  }
+
+  body.recording-pill-window {
+    color: inherit;
+  }
+
   /* Make the window draggable */
   .titlebar {
     -webkit-app-region: drag;

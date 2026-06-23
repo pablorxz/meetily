@@ -244,8 +244,8 @@ export default function RootLayout({
   }
 
   return (
-    <html lang="en">
-      <body className={`${sourceSans3.variable} font-sans antialiased`}>
+    <html lang="en" className={isRecordingPillRoute ? 'recording-pill-window' : undefined}>
+      <body className={`${sourceSans3.variable} font-sans antialiased${isRecordingPillRoute ? ' recording-pill-window' : ''}`}>
         <AnalyticsProvider>
           <RecordingStateProvider>
             <TranscriptProvider>

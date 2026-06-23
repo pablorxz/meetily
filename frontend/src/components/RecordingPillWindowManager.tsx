@@ -7,6 +7,8 @@ import { useRecordingState } from '@/contexts/RecordingStateContext';
 
 const RECORDING_PILL_LABEL = 'recording-pill';
 const RECORDING_PILL_ROUTE = 'recording-pill.html';
+const RECORDING_PILL_WIDTH = 214;
+const RECORDING_PILL_HEIGHT = 74;
 
 export default function RecordingPillWindowManager() {
   const { isRecording } = useRecordingState();
@@ -23,19 +25,20 @@ export default function RecordingPillWindowManager() {
     const pillWindow = new WebviewWindow(RECORDING_PILL_LABEL, {
       url: RECORDING_PILL_ROUTE,
       title: 'Meetily recording controls',
-      width: 238,
-      height: 86,
-      minWidth: 238,
-      minHeight: 86,
-      maxWidth: 238,
-      maxHeight: 86,
+      width: RECORDING_PILL_WIDTH,
+      height: RECORDING_PILL_HEIGHT,
+      minWidth: RECORDING_PILL_WIDTH,
+      minHeight: RECORDING_PILL_HEIGHT,
+      maxWidth: RECORDING_PILL_WIDTH,
+      maxHeight: RECORDING_PILL_HEIGHT,
       center: true,
       resizable: false,
       maximizable: false,
       minimizable: false,
       decorations: false,
       transparent: true,
-      shadow: true,
+      backgroundColor: '#00000000',
+      shadow: false,
       alwaysOnTop: true,
       skipTaskbar: true,
       visible: false,
@@ -50,6 +53,7 @@ export default function RecordingPillWindowManager() {
     try {
       const pillWindow = await getPillWindow();
       await pillWindow.setAlwaysOnTop(true);
+      await pillWindow.setShadow(false);
       await pillWindow.show();
     } catch (error) {
       console.error('[RecordingPillWindowManager] Failed to show pill window:', error);

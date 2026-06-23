@@ -1,0 +1,148 @@
+'use client';
+
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { invoke } from '@tauri-apps/api/core';
+import { emit } from '@tauri-apps/api/event';
+import { appDataDir } from '@tauri-apps/api/path';
+import { getCurrentWindow } from '@tauri-apps/api/window';
+import { Pause, Play, Square } from 'lucide-react';
+import { useRecordingState } from '@/contexts/RecordingStateContext';
+
+const BAR_COUNT = 6;
+
+function buildBarLevels(seed: number) {
+  return Array.from({ length: BAR_COUNT }, (_, index) => {
+    const wave = Math.sin(seed * (0.9 + index * 0.11) + index * 1.35);
+    const secondary = Math.sin(seed * 0.37 + index * 0.73);
+    return 0.22 + Math.abs(wave) * 0.58 + Math.max(0, secondary) * 0.2;
+  });
+}
+
+export default function RecordingPillPage() {
+  const { isRecording, isPaused, isStopping } = useRecordingState();
+  const [bars, setBars] = useState(() => buildBarLevels(0.4));
+  const [isBusy, setIsBusy] = useState(false);
+
+  const isDisabled = isBusy || isStopping || !isRecording;
+
+  const quietBars = useMemo(() => (
+    [0.22, 0.34, 0.26, 0.4, 0.28, 0.32]
+  ), []);
+
+  useEffect(() => {
+    if (!isRecording || isPaused) {
+      setBars(quietBars);
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setBars(buildBarLevels(Date.now() / 230));
+    }, 110);
+
+    return () => window.clearInterval(intervalId);
+  }, [isPaused, isRecording, quietBars]);
+
+  const startDragging = useCallback(async () => {
+    try {
+      await getCurrentWindow().startDragging();
+    } catch (error) {
+      console.error('[RecordingPill] Failed to drag window:', error);
+    }
+  }, []);
+
+  const restoreMainWindow = useCallback(async () => {
+    await emit('recording-pill-restore-main');
+  }, []);
+
+  const togglePause = useCallback(async () => {
+    if (isDisabled) return;
+
+    setIsBusy(true);
+    try {
+      await invoke(isPaused ? 'resume_recording' : 'pause_recording');
+    } catch (error) {
+      console.error('[RecordingPill] Failed to toggle pause:', error);
+    } finally {
+      setIsBusy(false);
+    }
+  }, [isDisabled, isPaused]);
+
+  const stopRecording = useCallback(async () => {
+    if (isDisabled) return;
+
+    setIsBusy(true);
+    try {
+      const dataDir = await appDataDir();
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const savePath = `${dataDir}/recording-${timestamp}.wav`;
+
+      await invoke('stop_recording', {
+        args: {
+          save_path: savePath,
+        },
+      });
+    } catch (error) {
+      console.error('[RecordingPill] Failed to stop recording:', error);
+    } finally {
+      setIsBusy(false);
+    }
+  }, [isDisabled]);
+
+  return (
+    <div className="flex h-screen w-screen items-center justify-center overflow-hidden bg-transparent">
+      <div className="flex h-[68px] w-[226px] select-none items-center rounded-full border border-gray-200 bg-white px-4 shadow-[0_16px_38px_rgba(15,23,42,0.18)]">
+        <button
+          type="button"
+          aria-label="Move recording controls"
+          title="Drag to move"
+          onMouseDown={(event) => {
+            if (event.button === 0) {
+              startDragging();
+            }
+          }}
+          onDoubleClick={restoreMainWindow}
+          className="mr-2 grid h-9 w-4 shrink-0 cursor-grab grid-cols-2 place-items-center gap-x-0.5 gap-y-1 rounded-full active:cursor-grabbing"
+        >
+          {Array.from({ length: 6 }).map((_, index) => (
+            <span key={index} className="h-1 w-1 rounded-full bg-gray-300" />
+          ))}
+        </button>
+
+        <button
+          type="button"
+          aria-label={isPaused ? 'Resume recording' : 'Pause recording'}
+          title={isPaused ? 'Resume recording' : 'Pause recording'}
+          disabled={isDisabled}
+          onClick={togglePause}
+          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-[3px] border-gray-300 bg-white text-gray-600 transition-colors hover:border-gray-400 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-55"
+        >
+          {isPaused ? <Play size={19} fill="currentColor" /> : <Pause size={20} strokeWidth={2.7} />}
+        </button>
+
+        <button
+          type="button"
+          aria-label="Stop recording"
+          title="Stop recording"
+          disabled={isDisabled}
+          onClick={stopRecording}
+          className="ml-3 flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-500 text-white transition-colors hover:bg-red-600 disabled:cursor-not-allowed disabled:bg-red-300"
+        >
+          <Square size={20} fill="currentColor" strokeWidth={2.2} />
+        </button>
+
+        <div className="ml-4 flex h-11 w-[54px] shrink-0 items-center justify-between" aria-hidden="true">
+          {bars.map((level, index) => (
+            <span
+              key={index}
+              className={`w-1.5 rounded-full transition-all duration-150 ${isPaused ? 'bg-red-300' : 'bg-red-500'}`}
+              style={{
+                height: `${Math.round(10 + level * 28)}px`,
+                opacity: isPaused ? 0.65 : 1,
+              }}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -40,7 +40,8 @@
                     "identifier": "main",
                     "description": "Main window capability with file system and media access",
                     "windows": [
-                        "main"
+                        "main",
+                        "recording-pill"
                     ],
                     "permissions": [
                         "fs:default",

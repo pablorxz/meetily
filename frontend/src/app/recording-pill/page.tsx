@@ -21,6 +21,19 @@ interface AudioLevelUpdate {
   levels: AudioLevelData[];
 }
 
+function formatElapsedTime(seconds: number) {
+  const totalSeconds = Math.max(0, Math.floor(seconds));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const remainingSeconds = totalSeconds % 60;
+
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+  }
+
+  return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+}
+
 function buildBarLevels(seed: number) {
   return Array.from({ length: BAR_COUNT }, (_, index) => {
     const wave = Math.sin(seed * (0.9 + index * 0.11) + index * 1.35);
@@ -43,12 +56,13 @@ function buildAudioBarLevels(rmsLevel: number, peakLevel: number) {
 }
 
 export default function RecordingPillPage() {
-  const { isRecording, isPaused, isStopping } = useRecordingState();
+  const { activeDuration, isRecording, isPaused, isStopping, recordingDuration } = useRecordingState();
   const [bars, setBars] = useState(() => buildBarLevels(0.4));
   const [isBusy, setIsBusy] = useState(false);
   const [hasRecentAudioLevels, setHasRecentAudioLevels] = useState(false);
 
   const isDisabled = isBusy || isStopping || !isRecording;
+  const elapsedText = formatElapsedTime(recordingDuration ?? activeDuration ?? 0);
 
   const quietBars = useMemo(() => (
     [0.22, 0.34, 0.26, 0.4, 0.28, 0.32]
@@ -182,8 +196,8 @@ export default function RecordingPillPage() {
   }, [isDisabled, restoreMainWindow]);
 
   return (
-    <div className="h-screen w-screen overflow-hidden rounded-full bg-transparent">
-      <div className="flex h-full w-full select-none items-center rounded-full border border-gray-200 bg-white pl-3 pr-2 shadow-none">
+    <div className="h-screen w-screen overflow-hidden rounded-full bg-transparent p-px">
+      <div className="flex h-full w-full select-none items-center rounded-full bg-white pl-2 pr-1.5 shadow-none">
         <button
           type="button"
           data-tauri-drag-region
@@ -195,10 +209,10 @@ export default function RecordingPillPage() {
             }
           }}
           onDoubleClick={restoreMainWindow}
-          className="mr-2 grid h-8 w-4 shrink-0 cursor-grab grid-cols-2 place-items-center gap-x-0.5 gap-y-1 rounded-full active:cursor-grabbing"
+          className="mr-1.5 grid h-7 w-3 shrink-0 cursor-grab grid-cols-2 place-items-center gap-x-0.5 gap-y-0.5 rounded-full active:cursor-grabbing"
         >
           {Array.from({ length: 6 }).map((_, index) => (
-            <span key={index} className="h-1 w-1 rounded-full bg-gray-300" />
+            <span key={index} className="h-[3px] w-[3px] rounded-full bg-gray-300" />
           ))}
         </button>
 
@@ -208,9 +222,9 @@ export default function RecordingPillPage() {
           title={isPaused ? 'Resume recording' : 'Pause recording'}
           disabled={isDisabled}
           onClick={togglePause}
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-[3px] border-gray-300 bg-white text-gray-600 transition-colors hover:border-gray-400 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-55"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-[2.5px] border-gray-300 bg-white text-gray-600 transition-colors hover:border-gray-400 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-55"
         >
-          {isPaused ? <Play size={16} fill="currentColor" /> : <Pause size={17} strokeWidth={2.7} />}
+          {isPaused ? <Play size={11} fill="currentColor" /> : <Pause size={12} strokeWidth={2.8} />}
         </button>
 
         <button
@@ -219,22 +233,27 @@ export default function RecordingPillPage() {
           title="Stop recording"
           disabled={isDisabled}
           onClick={stopRecording}
-          className="ml-2.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-500 text-white transition-colors hover:bg-red-600 disabled:cursor-not-allowed disabled:bg-red-300"
+          className="ml-1.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-red-500 text-white transition-colors hover:bg-red-600 disabled:cursor-not-allowed disabled:bg-red-300"
         >
-          <Square size={17} fill="currentColor" strokeWidth={2.2} />
+          <Square size={12} fill="currentColor" strokeWidth={2.3} />
         </button>
 
-        <div className="ml-3 flex h-9 w-[45px] shrink-0 items-center justify-between pr-2.5" aria-hidden="true">
-          {bars.map((level, index) => (
-            <span
-              key={index}
-              className={`w-1 rounded-full transition-all duration-150 ${isPaused ? 'bg-red-300' : 'bg-red-500'}`}
-              style={{
-                height: `${Math.round(8 + level * 24)}px`,
-                opacity: isPaused ? 0.65 : 1,
-              }}
-            />
-          ))}
+        <div className="ml-2 flex h-8 w-9 shrink-0 flex-col items-center justify-center gap-0.5 pr-1" aria-label={`Elapsed recording time ${elapsedText}`}>
+          <div className="flex h-5 w-full items-center justify-between" aria-hidden="true">
+            {bars.map((level, index) => (
+              <span
+                key={index}
+                className={`w-[3px] rounded-full transition-all duration-150 ${isPaused ? 'bg-red-300' : 'bg-red-500'}`}
+                style={{
+                  height: `${Math.round(5 + level * 15)}px`,
+                  opacity: isPaused ? 0.65 : 1,
+                }}
+              />
+            ))}
+          </div>
+          <span className="w-full text-center font-mono text-[8px] leading-none text-gray-500 tabular-nums">
+            {elapsedText}
+          </span>
         </div>
       </div>
     </div>

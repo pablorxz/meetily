@@ -247,8 +247,8 @@ export default function RecordingPillPage() {
   }, [isDisabled, restoreMainWindow]);
 
   return (
-    <div className="h-screen w-screen overflow-hidden rounded-full bg-transparent p-px">
-      <div className="flex h-full w-full select-none items-center rounded-full border border-gray-300 bg-white bg-clip-padding pl-2 pr-1.5 shadow-none">
+    <div className="flex h-screen w-screen items-center justify-center overflow-hidden rounded-full bg-transparent p-1">
+      <div className="flex h-11 w-[150px] select-none items-center rounded-full bg-white pl-2 pr-1.5 shadow-[inset_0_0_0_1px_rgb(209,213,219)]">
         <button
           type="button"
           data-tauri-drag-region

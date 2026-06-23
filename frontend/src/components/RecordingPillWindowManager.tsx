@@ -7,8 +7,8 @@ import { useRecordingState } from '@/contexts/RecordingStateContext';
 
 const RECORDING_PILL_LABEL = 'recording-pill';
 const RECORDING_PILL_ROUTE = 'recording-pill.html';
-const RECORDING_PILL_WIDTH = 150;
-const RECORDING_PILL_HEIGHT = 44;
+const RECORDING_PILL_WIDTH = 158;
+const RECORDING_PILL_HEIGHT = 52;
 
 export default function RecordingPillWindowManager() {
   const { isRecording } = useRecordingState();

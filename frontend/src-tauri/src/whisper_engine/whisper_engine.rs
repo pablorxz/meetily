@@ -369,8 +369,10 @@ impl WhisperEngine {
             return String::new();
         }
 
+        let text = Self::remove_repeated_exclamation_runs(text);
+
         // Check for obviously meaningless patterns first
-        if Self::is_meaningless_output(text) {
+        if Self::is_meaningless_output(&text) {
             // Performance optimization: reduce meaningless output logging to debug level
             perf_debug!("Detected meaningless output, returning empty: '{}'", text);
             return String::new();
@@ -396,6 +398,25 @@ impl WhisperEngine {
         }
 
         final_text
+    }
+
+    fn remove_repeated_exclamation_runs(text: &str) -> String {
+        let mut cleaned = String::with_capacity(text.len());
+        let mut exclamation_count = 0;
+
+        for ch in text.chars() {
+            if ch == '!' {
+                exclamation_count += 1;
+                if exclamation_count <= 2 {
+                    cleaned.push(ch);
+                }
+            } else {
+                exclamation_count = 0;
+                cleaned.push(ch);
+            }
+        }
+
+        cleaned
     }
 
     // Check for obviously meaningless patterns
@@ -533,7 +554,7 @@ impl WhisperEngine {
         // If language is "auto-translate", enable translation to English
         // Otherwise, use the specified language code
         let (language_code, should_translate) = match language.as_deref() {
-            Some("auto") | None => (None, false),
+            Some("auto") | None => (Some("es"), false),
             Some("auto-translate") => (None, true),
             Some(lang) => (Some(lang), false),
         };
@@ -650,7 +671,7 @@ impl WhisperEngine {
         // If language is "auto-translate", enable translation to English
         // Otherwise, use the specified language code
         let (language_code, should_translate) = match language.as_deref() {
-            Some("auto") | None => (None, false),
+            Some("auto") | None => (Some("es"), false),
             Some("auto-translate") => (None, true),
             Some(lang) => (Some(lang), false),
         };

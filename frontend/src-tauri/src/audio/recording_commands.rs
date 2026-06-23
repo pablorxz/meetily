@@ -66,12 +66,12 @@ pub struct TranscriptionStatus {
 // ============================================================================
 
 /// Start recording with default devices
-pub async fn start_recording<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
+pub async fn start_recording<R: Runtime + 'static>(app: AppHandle<R>) -> Result<(), String> {
     start_recording_with_meeting_name(app, None).await
 }
 
 /// Start recording with default devices and optional meeting name
-pub async fn start_recording_with_meeting_name<R: Runtime>(
+pub async fn start_recording_with_meeting_name<R: Runtime + 'static>(
     app: AppHandle<R>,
     meeting_name: Option<String>,
 ) -> Result<(), String> {
@@ -232,11 +232,19 @@ pub async fn start_recording_with_meeting_name<R: Runtime>(
         let _ = app_for_error.emit("recording-error", error.user_message());
     });
 
+    super::spectrum_monitor::start(app.clone());
+
     // Start recording with resolved devices (replaces start_recording_with_defaults_and_auto_save call)
-    let transcription_receiver = manager
+    let transcription_receiver = match manager
         .start_recording(microphone_device, system_device, auto_save)
         .await
-        .map_err(|e| format!("Failed to start recording: {}", e))?;
+    {
+        Ok(receiver) => receiver,
+        Err(e) => {
+            super::spectrum_monitor::stop();
+            return Err(format!("Failed to start recording: {}", e));
+        }
+    };
 
     // Store the manager globally to keep it alive
     {
@@ -308,7 +316,7 @@ pub async fn start_recording_with_meeting_name<R: Runtime>(
 }
 
 /// Start recording with specific devices
-pub async fn start_recording_with_devices<R: Runtime>(
+pub async fn start_recording_with_devices<R: Runtime + 'static>(
     app: AppHandle<R>,
     mic_device_name: Option<String>,
     system_device_name: Option<String>,
@@ -317,7 +325,7 @@ pub async fn start_recording_with_devices<R: Runtime>(
 }
 
 /// Start recording with specific devices and optional meeting name
-pub async fn start_recording_with_devices_and_meeting<R: Runtime>(
+pub async fn start_recording_with_devices_and_meeting<R: Runtime + 'static>(
     app: AppHandle<R>,
     mic_device_name: Option<String>,
     system_device_name: Option<String>,
@@ -405,11 +413,19 @@ pub async fn start_recording_with_devices_and_meeting<R: Runtime>(
         let _ = app_for_error.emit("recording-error", error.user_message());
     });
 
+    super::spectrum_monitor::start(app.clone());
+
     // Start recording with specified devices and auto_save setting
-    let transcription_receiver = manager
+    let transcription_receiver = match manager
         .start_recording(mic_device, system_device, auto_save)
         .await
-        .map_err(|e| format!("Failed to start recording: {}", e))?;
+    {
+        Ok(receiver) => receiver,
+        Err(e) => {
+            super::spectrum_monitor::stop();
+            return Err(format!("Failed to start recording: {}", e));
+        }
+    };
 
     // Store the manager globally to keep it alive
     {
@@ -531,9 +547,11 @@ pub async fn stop_recording<R: Runtime>(
     match stop_result {
         Ok(_) => {
             info!("✅ Audio streams stopped successfully - no more chunks will be created");
+            super::spectrum_monitor::stop();
         }
         Err(e) => {
             error!("❌ Failed to stop audio streams: {}", e);
+            super::spectrum_monitor::stop();
             return Err(format!("Failed to stop audio streams: {}", e));
         }
     }

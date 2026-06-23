@@ -15,10 +15,12 @@ const BAR_COUNT = 6;
 interface AudioLevelData {
   rms_level: number;
   peak_level: number;
+  frequency_bands?: number[];
 }
 
 interface AudioLevelUpdate {
   levels: AudioLevelData[];
+  frequency_bands?: number[];
 }
 
 function formatElapsedTime(seconds: number) {
@@ -34,15 +36,15 @@ function formatElapsedTime(seconds: number) {
   return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
 }
 
-function buildBarLevels(seed: number) {
-  return Array.from({ length: BAR_COUNT }, (_, index) => {
-    const wave = Math.sin(seed * (0.9 + index * 0.11) + index * 1.35);
-    const secondary = Math.sin(seed * 0.37 + index * 0.73);
-    return 0.22 + Math.abs(wave) * 0.58 + Math.max(0, secondary) * 0.2;
-  });
+function normalizeFrequencyBands(bands?: number[]) {
+  if (!bands || bands.length < BAR_COUNT) return null;
+
+  return Array.from({ length: BAR_COUNT }, (_, index) => (
+    Math.max(0, Math.min(1, bands[index] ?? 0))
+  ));
 }
 
-function buildAudioBarLevels(rmsLevel: number, peakLevel: number) {
+function buildLevelFallbackBands(rmsLevel: number, peakLevel: number) {
   const rms = Math.max(0, Math.min(1, rmsLevel));
   const peak = Math.max(rms, Math.min(1, peakLevel));
   const level = Math.max(0.12, Math.min(1, rms * 2.7 + peak * 0.35));
@@ -50,8 +52,34 @@ function buildAudioBarLevels(rmsLevel: number, peakLevel: number) {
   return Array.from({ length: BAR_COUNT }, (_, index) => {
     const emphasis = index === 2 || index === 3 ? 1 : 0.72;
     const taper = index === 0 || index === 5 ? 0.58 : emphasis;
-    const motion = 0.82 + Math.sin(Date.now() / 125 + index * 0.9) * 0.18;
-    return Math.max(0.16, Math.min(1, level * taper * motion));
+    return Math.max(0.12, Math.min(1, level * taper));
+  });
+}
+
+function combineFrequencyBands(levels: AudioLevelData[]) {
+  const combined = Array.from({ length: BAR_COUNT }, () => 0);
+  let foundBands = false;
+
+  for (const level of levels) {
+    const bands = normalizeFrequencyBands(level.frequency_bands);
+    if (!bands) continue;
+
+    foundBands = true;
+    for (let index = 0; index < BAR_COUNT; index += 1) {
+      combined[index] = Math.sqrt(combined[index] ** 2 + bands[index] ** 2);
+    }
+  }
+
+  if (!foundBands) return null;
+
+  return combined.map(level => Math.max(0, Math.min(1, level)));
+}
+
+function smoothBarLevels(previous: number[], next: number[]) {
+  return next.map((level, index) => {
+    const current = previous[index] ?? 0;
+    const attack = level > current ? 0.7 : 0.32;
+    return current * (1 - attack) + level * attack;
   });
 }
 
@@ -65,9 +93,8 @@ export default function RecordingPillPage() {
     isStopping,
     recordingDuration,
   } = useRecordingState();
-  const [bars, setBars] = useState(() => buildBarLevels(0.4));
+  const [bars, setBars] = useState(() => Array.from({ length: BAR_COUNT }, () => 0.12));
   const [isBusy, setIsBusy] = useState(false);
-  const [hasRecentAudioLevels, setHasRecentAudioLevels] = useState(false);
   const [isStopRequested, setIsStopRequested] = useState(false);
 
   const isDisabled = isBusy || isStopping || !isRecording;
@@ -75,27 +102,24 @@ export default function RecordingPillPage() {
   const elapsedText = isFinalizing ? 'saving' : formatElapsedTime(recordingDuration ?? activeDuration ?? 0);
 
   const quietBars = useMemo(() => (
-    [0.22, 0.34, 0.26, 0.4, 0.28, 0.32]
+    [0.1, 0.12, 0.1, 0.13, 0.11, 0.1]
   ), []);
 
   useEffect(() => {
     if (!isRecording || isPaused) {
       setBars(quietBars);
-      setHasRecentAudioLevels(false);
       return;
     }
 
     const intervalId = window.setInterval(() => {
-      if (hasRecentAudioLevels) {
-        setHasRecentAudioLevels(false);
-        return;
-      }
-
-      setBars(buildBarLevels(Date.now() / 230));
+      setBars(previous => previous.map((level, index) => {
+        const floor = quietBars[index] ?? 0.1;
+        return Math.max(floor, level * 0.78);
+      }));
     }, 110);
 
     return () => window.clearInterval(intervalId);
-  }, [hasRecentAudioLevels, isPaused, isRecording, quietBars]);
+  }, [isPaused, isRecording, quietBars]);
 
   useEffect(() => {
     if (!isRecording && !isStopping && !isProcessing && !isSaving && !isBusy) {
@@ -125,14 +149,23 @@ export default function RecordingPillPage() {
       if (!isRecording || isPaused) return;
 
       const levels = event.payload.levels ?? [];
+      const rootBands = normalizeFrequencyBands(event.payload.frequency_bands);
+      const levelBands = rootBands ?? combineFrequencyBands(levels);
+
+      if (levelBands) {
+        setBars(previous => smoothBarLevels(previous, levelBands));
+        return;
+      }
+
       if (!levels.length) return;
 
       const loudest = levels.reduce((best, current) => (
         current.peak_level > best.peak_level ? current : best
       ), levels[0]);
-
-      setHasRecentAudioLevels(true);
-      setBars(buildAudioBarLevels(loudest.rms_level, loudest.peak_level));
+      setBars(previous => smoothBarLevels(
+        previous,
+        buildLevelFallbackBands(loudest.rms_level, loudest.peak_level),
+      ));
     }).then((listener) => {
       unlisten = listener;
     }).catch((error) => {
